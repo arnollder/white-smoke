@@ -95,7 +95,7 @@ useSeoMeta({
     <div v-if="!items.length" class="mt-16 text-center">
       <UIcon name="i-lucide-shopping-bag" class="mx-auto size-12 text-smoke-600" />
       <p class="mt-4 text-smoke-400">Пока пусто</p>
-      <UButton to="/catalog" class="mt-6" label="В витрину" />
+      <UButton to="/#catalog" class="mt-6" label="В витрину" />
     </div>
 
     <div v-else class="mt-10 grid gap-12 lg:grid-cols-[1fr_380px]">

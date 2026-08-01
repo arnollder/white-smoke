@@ -2,8 +2,8 @@
 const { cartCount } = useCart()
 
 const links = [
-  { label: 'Каталог', to: '/catalog' },
-  { label: 'Магазины', to: '/stores' }
+  { label: 'Витрина', to: '/#catalog' },
+  { label: 'Магазины', to: '/#stores' }
 ]
 </script>
 
@@ -43,7 +43,7 @@ const links = [
             aria-label="Корзина"
           />
           <UButton
-            to="/catalog"
+            to="/#catalog"
             class="hidden sm:inline-flex"
             label="В витрину"
             trailing-icon="i-lucide-arrow-right"
@@ -67,8 +67,8 @@ const links = [
           </p>
         </div>
         <div class="flex flex-wrap gap-3 text-sm">
-          <NuxtLink to="/catalog" class="text-smoke-400 transition hover:text-mist-400">Каталог</NuxtLink>
-          <NuxtLink to="/stores" class="text-smoke-400 transition hover:text-mist-400">Магазины</NuxtLink>
+          <NuxtLink to="/#catalog" class="text-smoke-400 transition hover:text-mist-400">Витрина</NuxtLink>
+          <NuxtLink to="/#stores" class="text-smoke-400 transition hover:text-mist-400">Магазины</NuxtLink>
           <NuxtLink to="/cart" class="text-smoke-400 transition hover:text-mist-400">Корзина</NuxtLink>
         </div>
       </div>
