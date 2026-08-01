@@ -39,20 +39,12 @@ function isActive(match: string) {
         </nav>
 
         <div class="flex items-center gap-2">
-          <UButton
-            to="/cart"
-            variant="soft"
-            color="primary"
-            icon="i-lucide-shopping-bag"
-            :label="cartCount ? String(cartCount) : undefined"
-            aria-label="Корзина"
-          />
           <NuxtLink
-            to="/catalog"
-            class="ws-nav-cta hidden sm:inline-flex"
+            to="/cart"
+            class="ws-nav-cta"
           >
-            В витрину
-            <UIcon name="i-lucide-arrow-up-right" class="size-4" />
+            <UIcon name="i-lucide-shopping-bag" class="size-4" />
+            {{ cartCount ? `Корзина · ${cartCount}` : 'Корзина' }}
           </NuxtLink>
         </div>
       </div>
@@ -147,6 +139,7 @@ function isActive(match: string) {
 }
 
 .ws-nav-cta {
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.45rem 0.85rem;
@@ -157,6 +150,7 @@ function isActive(match: string) {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-smoke-200);
+  text-decoration: none;
   transition:
     color 0.25s ease,
     border-color 0.25s ease,
