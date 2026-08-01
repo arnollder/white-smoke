@@ -95,8 +95,8 @@ const links = [
 }
 
 .nav-button {
-  padding-right: 2rem;
   text-transform: uppercase;  
-  font-size: 2rem;  
+  font-size: 1rem;
+  letter-spacing: 0.1em;
 }
 </style>
