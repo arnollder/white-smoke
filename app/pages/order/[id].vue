@@ -24,8 +24,8 @@ useSeoMeta({
       ID: {{ id }}
     </p>
     <div class="mt-10 flex flex-wrap justify-center gap-3">
-      <UButton to="/#catalog" label="В витрину" />
-      <UButton to="/#stores" color="neutral" variant="outline" label="Адреса магазинов" />
+      <UButton to="/catalog" label="В витрину" />
+      <UButton to="/stores" color="neutral" variant="outline" label="Адреса магазинов" />
     </div>
   </div>
 </template>

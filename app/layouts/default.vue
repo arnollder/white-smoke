@@ -3,65 +3,12 @@ const route = useRoute()
 const { cartCount } = useCart()
 
 const links = [
-  { label: 'Витрина', to: '/#catalog', hash: 'catalog' },
-  { label: 'Магазины', to: '/#stores', hash: 'stores' }
+  { label: 'Витрина', to: '/catalog', match: '/catalog' },
+  { label: 'Магазины', to: '/stores', match: '/stores' }
 ] as const
 
-const activeHash = ref('')
-let sectionObserver: IntersectionObserver | null = null
-
-function syncActiveFromRoute() {
-  const h = String(route.hash || '').replace(/^#/, '')
-  if (h) {
-    activeHash.value = h
-    return
-  }
-  if (route.path !== '/') {
-    activeHash.value = ''
-  }
-}
-
-function teardownObserver() {
-  sectionObserver?.disconnect()
-  sectionObserver = null
-}
-
-function setupObserver() {
-  teardownObserver()
-  if (!import.meta.client || route.path !== '/') return
-
-  const ids = links.map(l => l.hash)
-  sectionObserver = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter(e => e.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
-      const top = visible[0]
-      if (top?.target?.id) {
-        activeHash.value = top.target.id
-      }
-    },
-    {
-      rootMargin: '-20% 0px -55% 0px',
-      threshold: [0, 0.25, 0.5]
-    }
-  )
-
-  for (const id of ids) {
-    const el = document.getElementById(id)
-    if (el) sectionObserver.observe(el)
-  }
-}
-
-watch(() => [route.path, route.hash], () => {
-  syncActiveFromRoute()
-  nextTick(setupObserver)
-}, { immediate: true })
-
-onBeforeUnmount(teardownObserver)
-
-function isActive(hash: string) {
-  return activeHash.value === hash
+function isActive(match: string) {
+  return route.path === match || route.path.startsWith(`${match}/`)
 }
 </script>
 
@@ -84,7 +31,7 @@ function isActive(hash: string) {
             :key="link.to"
             :to="link.to"
             class="ws-nav-link font-display"
-            :class="{ 'is-active': isActive(link.hash) }"
+            :class="{ 'is-active': isActive(link.match) }"
           >
             <span class="ws-nav-label">{{ link.label }}</span>
             <span class="ws-nav-line" aria-hidden="true" />
@@ -101,7 +48,7 @@ function isActive(hash: string) {
             aria-label="Корзина"
           />
           <NuxtLink
-            to="/#catalog"
+            to="/catalog"
             class="ws-nav-cta hidden sm:inline-flex"
           >
             В витрину
@@ -126,8 +73,8 @@ function isActive(hash: string) {
           </p>
         </div>
         <div class="flex flex-wrap gap-3 text-sm">
-          <NuxtLink to="/#catalog" class="text-smoke-400 transition hover:text-mist-400">Витрина</NuxtLink>
-          <NuxtLink to="/#stores" class="text-smoke-400 transition hover:text-mist-400">Магазины</NuxtLink>
+          <NuxtLink to="/catalog" class="text-smoke-400 transition hover:text-mist-400">Витрина</NuxtLink>
+          <NuxtLink to="/stores" class="text-smoke-400 transition hover:text-mist-400">Магазины</NuxtLink>
           <NuxtLink to="/cart" class="text-smoke-400 transition hover:text-mist-400">Корзина</NuxtLink>
         </div>
       </div>

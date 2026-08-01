@@ -58,7 +58,7 @@ function formatPrice(value: number) {
 <template>
   <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
     <UButton
-      to="/#catalog"
+      to="/catalog"
       variant="ghost"
       color="neutral"
       icon="i-lucide-arrow-left"
