@@ -79,26 +79,24 @@ const links = [
 <style scoped>
 .logo-up {
   transform: translate(0, 0.7rem);
-
 }
 .logo-down {
   transform: translate(1.2rem, -0.7rem);
 }
 
 .heder-logo {
-  padding: 0 3rem 0.1rem 0.5rem;
-  
-  transform: translate(0, 1.8rem);
+  padding: 0 1rem 0 0.1rem;
 
+  transform: translate(0, 1.8rem);
   font-size: 2rem;  
-  /* border: 1px double; */
-  border-radius: 1rem 2rem 7rem 3rem;
+  border-top: 0.1rem solid;
+  border-bottom: 0.1rem double;
+  border-radius: 1rem 7rem 2rem 3rem;
 }
 
 .nav-button {
   padding-right: 2rem;
   text-transform: uppercase;  
   font-size: 2rem;  
-
 }
 </style>
