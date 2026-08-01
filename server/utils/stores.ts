@@ -34,7 +34,7 @@ function envStoreSlot(index: 1 | 2 | 3): StoreConfig {
     address: process.env[`STORE_${index}_ADDRESS`] || 'г. Дзержинск',
     hours: process.env[`STORE_${index}_HOURS`] || 'Ежедневно 10:00–22:00',
     phone: process.env[`STORE_${index}_PHONE`] || '',
-    msId
+    msId: msId.trim()
   }
 }
 
@@ -43,9 +43,14 @@ export function getStoreConfigsFromEnv(): StoreConfig[] {
   return [envStoreSlot(1), envStoreSlot(2), envStoreSlot(3)]
 }
 
+function normName(name: string): string {
+  return name.trim().toLowerCase().replace(/ё/g, 'е')
+}
+
 /**
  * Resolve up to 3 shop warehouses.
- * Uses MOYSKLAD_STORE_*_ID when set; otherwise loads stores from MoySklad.
+ * Uses MOYSKLAD_STORE_*_ID when set and valid in MoySklad;
+ * otherwise matches STORE_*_NAME, then fills from remaining warehouses.
  */
 export async function resolveStoreConfigs(): Promise<StoreConfig[]> {
   const now = Date.now()
@@ -54,15 +59,8 @@ export async function resolveStoreConfigs(): Promise<StoreConfig[]> {
   }
 
   const fromEnv = getStoreConfigsFromEnv()
-  const configured = fromEnv.filter(s => s.msId)
+  const token = useRuntimeConfig().moyskladToken?.trim()
 
-  if (configured.length === 3) {
-    storeCache.stores = fromEnv
-    storeCache.at = now
-    return fromEnv
-  }
-
-  const token = useRuntimeConfig().moyskladToken
   if (!token) {
     storeCache.stores = fromEnv
     storeCache.at = now
@@ -73,58 +71,58 @@ export async function resolveStoreConfigs(): Promise<StoreConfig[]> {
     filter: 'archived=false'
   })).filter(s => !s.archived)
 
-  // Keep env order when IDs set; fill gaps from MS by name match then remaining
-  const used = new Set(configured.map(s => s.msId))
-  const remaining = msStores.filter(s => !used.has(s.id))
+  if (!msStores.length) {
+    storeCache.stores = fromEnv
+    storeCache.at = now
+    return fromEnv
+  }
+
+  const byId = new Map(msStores.map(s => [s.id, s]))
+  const remaining = [...msStores]
+  const take = (ms: MsStore | undefined) => {
+    if (!ms) return undefined
+    const idx = remaining.findIndex(s => s.id === ms.id)
+    if (idx >= 0) remaining.splice(idx, 1)
+    return ms
+  }
 
   const resolved: StoreConfig[] = fromEnv.map((slot, i) => {
-    if (slot.msId) {
-      const ms = msStores.find(s => s.id === slot.msId)
-      return {
-        ...slot,
-        name: process.env[`STORE_${i + 1}_NAME`] || ms?.name || slot.name,
-        address: process.env[`STORE_${i + 1}_ADDRESS`] || ms?.address || slot.address
-      }
+    const index = (i + 1) as 1 | 2 | 3
+    const envName = process.env[`STORE_${index}_NAME`]
+    const envAddress = process.env[`STORE_${index}_ADDRESS`]
+    const envHours = process.env[`STORE_${index}_HOURS`]
+    const envPhone = process.env[`STORE_${index}_PHONE`]
+
+    // Prefer valid MoySklad UUID from env
+    let ms = slot.msId ? byId.get(slot.msId) : undefined
+
+    // Stale/wrong UUID → match by public name
+    if (!ms && envName) {
+      const want = normName(envName)
+      ms = remaining.find(s => normName(s.name) === want)
+        || remaining.find(s => normName(s.name).includes(want) || want.includes(normName(s.name)))
     }
 
-    const byName = remaining.find(s =>
-      s.name.toLowerCase() === slot.name.toLowerCase()
-    )
-    const pick = byName || remaining.shift()
-    if (byName) {
-      const idx = remaining.indexOf(byName)
-      if (idx >= 0) remaining.splice(idx, 1)
+    // Last resort: next unused warehouse
+    if (!ms) {
+      ms = remaining[0]
     }
 
-    if (!pick) return slot
+    ms = take(ms)
+    if (!ms) return { ...slot, msId: '' }
 
     return {
-      ...slot,
-      msId: pick.id,
-      name: process.env[`STORE_${i + 1}_NAME`] || pick.name,
-      address: process.env[`STORE_${i + 1}_ADDRESS`] || pick.address || slot.address
+      slug: slot.slug,
+      name: envName || ms.name,
+      address: envAddress || ms.address || slot.address,
+      hours: envHours || slot.hours,
+      phone: envPhone || slot.phone,
+      msId: ms.id
     }
   })
 
-  // If still empty slots but MS has stores, assign first 3 MS stores
   const withIds = resolved.filter(s => s.msId)
-  if (withIds.length === 0 && msStores.length > 0) {
-    const filled = msStores.slice(0, 3).map((s, i) => ({
-      slug: `store-${i + 1}`,
-      name: process.env[`STORE_${i + 1}_NAME`] || s.name,
-      address: process.env[`STORE_${i + 1}_ADDRESS`] || s.address || 'г. Дзержинск',
-      hours: process.env[`STORE_${i + 1}_HOURS`] || 'Ежедневно 10:00–22:00',
-      phone: process.env[`STORE_${i + 1}_PHONE`] || '',
-      msId: s.id
-    }))
-    storeCache.stores = filled
-    storeCache.at = now
-    return filled
-  }
-
-  storeCache.stores = resolved.filter(s => s.msId).length
-    ? resolved
-    : fromEnv
+  storeCache.stores = withIds.length ? withIds : fromEnv
   storeCache.at = now
   return storeCache.stores
 }
