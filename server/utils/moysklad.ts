@@ -126,7 +126,8 @@ export interface MsCustomerOrder {
 
 /** Extract UUID from MoySklad href. */
 export function idFromHref(href: string): string {
-  const parts = href.split(/[/?]/).filter(Boolean)
+  const clean = (href.split('?')[0] || href).replace(/\/$/, '')
+  const parts = clean.split('/').filter(Boolean)
   return parts[parts.length - 1] || href
 }
 

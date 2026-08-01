@@ -20,11 +20,11 @@ export default defineNuxtConfig({
     ]
   },
   runtimeConfig: {
-    moyskladToken: process.env.MOYSKLAD_TOKEN || '',
-    moyskladOrganizationId: process.env.MOYSKLAD_ORGANIZATION_ID || '',
-    moyskladStore1Id: process.env.MOYSKLAD_STORE_1_ID || '',
-    moyskladStore2Id: process.env.MOYSKLAD_STORE_2_ID || '',
-    moyskladStore3Id: process.env.MOYSKLAD_STORE_3_ID || '',
+    moyskladToken: process.env.MOYSKLAD_TOKEN || process.env.NUXT_MOYSKLAD_TOKEN || '',
+    moyskladOrganizationId: process.env.MOYSKLAD_ORGANIZATION_ID || process.env.NUXT_MOYSKLAD_ORGANIZATION_ID || '',
+    moyskladStore1Id: process.env.MOYSKLAD_STORE_1_ID || process.env.NUXT_MOYSKLAD_STORE_1_ID || '',
+    moyskladStore2Id: process.env.MOYSKLAD_STORE_2_ID || process.env.NUXT_MOYSKLAD_STORE_2_ID || '',
+    moyskladStore3Id: process.env.MOYSKLAD_STORE_3_ID || process.env.NUXT_MOYSKLAD_STORE_3_ID || '',
     public: {
       siteName: 'White Smoke',
       city: 'Дзержинск'

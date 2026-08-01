@@ -102,13 +102,13 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
     if (!input.storeSlug) {
       throw createError({ statusCode: 400, statusMessage: 'Выберите магазин для самовывоза' })
     }
-    const found = findStoreBySlug(input.storeSlug)
+    const found = await findStoreBySlug(input.storeSlug)
     if (!found?.msId) {
       throw createError({ statusCode: 400, statusMessage: 'Неизвестный магазин' })
     }
     store = found
   } else {
-    store = getDeliveryStore()
+    store = await getDeliveryStore()
     if (!store.msId) {
       throw createError({ statusCode: 503, statusMessage: 'Склад для доставки не настроен' })
     }

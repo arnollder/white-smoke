@@ -1,3 +1,3 @@
-export default defineEventHandler(() => {
-  return getPublicStores()
+export default defineEventHandler(async () => {
+  return await getPublicStores()
 })

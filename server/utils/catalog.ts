@@ -3,12 +3,13 @@ import {
   fetchAllPages,
   idFromHref,
   msFetch,
+  MoySkladError,
   type MsAssortmentRow,
   type MsImageRow,
   type MsProduct,
   type MsStockByStoreRow
 } from './moysklad'
-import { getStoreConfigs } from './stores'
+import { resolveStoreConfigs, type StoreConfig } from './stores'
 
 function priceFromProduct(p: MsProduct | MsAssortmentRow): number {
   const value = p.salePrices?.[0]?.value
@@ -33,75 +34,87 @@ function categoryFromProduct(p: MsProduct | MsAssortmentRow): string | null {
   return p.productFolder?.name || null
 }
 
-function buildStocks(stockRow: MsStockByStoreRow | undefined): StoreStock[] {
-  const stores = getStoreConfigs().filter(s => s.msId)
+function buildStocks(stockRow: MsStockByStoreRow | undefined, stores: StoreConfig[]): StoreStock[] {
   const byId = new Map<string, number>()
 
   for (const entry of stockRow?.stockByStore || []) {
     const storeId = idFromHref(entry.meta.href)
-    // Available = stock - reserve (stock field in bystore is free stock in some docs; use stock as available)
-    byId.set(storeId, Math.max(0, entry.stock ?? 0))
+    // report/stock/bystore.stock = доступно (без резерва)
+    byId.set(storeId, Math.max(0, Math.floor(entry.stock ?? 0)))
   }
 
-  return stores.map((s) => {
-    const stock = byId.get(s.msId) ?? 0
-    return {
-      storeSlug: s.slug,
-      storeName: s.name,
-      stock
-    }
-  })
+  return stores.map((s) => ({
+    storeSlug: s.slug,
+    storeName: s.name,
+    stock: s.msId ? (byId.get(s.msId) ?? 0) : 0
+  }))
 }
 
 export async function getCatalogProducts(): Promise<CatalogProduct[]> {
-  const stores = getStoreConfigs().filter(s => s.msId)
-  const useDemo = !useRuntimeConfig().moyskladToken || stores.length === 0
-
-  if (useDemo) {
-    return getDemoCatalog()
+  const token = useRuntimeConfig().moyskladToken?.trim()
+  if (!token) {
+    return getDemoCatalog(await resolveStoreConfigs())
   }
 
-  const [assortment, stockRows] = await Promise.all([
-    fetchAllPages<MsAssortmentRow>('/entity/assortment', {
-      filter: 'archived=false',
-      expand: 'productFolder'
-    }),
-    fetchAllPages<MsStockByStoreRow>('/report/stock/bystore')
-  ])
+  try {
+    const stores = (await resolveStoreConfigs()).filter(s => s.msId)
+    if (!stores.length) {
+      throw createError({
+        statusCode: 503,
+        statusMessage: 'Не найдены склады в МойСклад. Проверьте токен или MOYSKLAD_STORE_*_ID'
+      })
+    }
 
-  const stockMap = new Map<string, MsStockByStoreRow>()
-  for (const row of stockRows) {
-    stockMap.set(idFromHref(row.meta.href), row)
-  }
+    const [assortment, stockRows] = await Promise.all([
+      fetchAllPages<MsAssortmentRow>('/entity/assortment', {
+        filter: 'archived=false',
+        expand: 'productFolder'
+      }),
+      fetchAllPages<MsStockByStoreRow>('/report/stock/bystore')
+    ])
 
-  const products: CatalogProduct[] = []
+    const stockMap = new Map<string, MsStockByStoreRow>()
+    for (const row of stockRows) {
+      stockMap.set(idFromHref(row.meta.href), row)
+    }
 
-  for (const row of assortment) {
-    if (row.archived) continue
-    const type = row.meta?.type
-    if (type !== 'product' && type !== 'variant') continue
+    const products: CatalogProduct[] = []
 
-    const id = row.id
-    const stocks = buildStocks(stockMap.get(id))
-    const totalStock = stocks.reduce((s, x) => s + x.stock, 0)
-    const hasImage = (row.images?.meta?.size ?? 0) > 0
+    for (const row of assortment) {
+      if (row.archived) continue
+      const type = row.meta?.type
+      if (type !== 'product' && type !== 'variant') continue
 
-    products.push({
-      id,
-      slug: slugify(row.name, id),
-      name: row.name,
-      description: row.description || '',
-      article: row.article || row.code || '',
-      price: priceFromProduct(row),
-      currency: 'RUB',
-      imageUrl: hasImage ? `/api/catalog/image/${id}` : null,
-      category: categoryFromProduct(row),
-      stocks,
-      totalStock
+      const id = row.id
+      const stocks = buildStocks(stockMap.get(id), stores)
+      const totalStock = stocks.reduce((s, x) => s + x.stock, 0)
+      const hasImage = (row.images?.meta?.size ?? 0) > 0
+
+      products.push({
+        id,
+        slug: slugify(row.name, id),
+        name: row.name,
+        description: row.description || '',
+        article: row.article || row.code || '',
+        price: priceFromProduct(row),
+        currency: 'RUB',
+        imageUrl: hasImage ? `/api/catalog/image/${id}` : null,
+        category: categoryFromProduct(row),
+        stocks,
+        totalStock
+      })
+    }
+
+    return products.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'statusCode' in err) throw err
+    const e = err as MoySkladError
+    throw createError({
+      statusCode: e.status || 502,
+      statusMessage: e.message || 'Не удалось загрузить витрину из МойСклад',
+      data: e.body
     })
   }
-
-  return products.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 }
 
 export async function getCatalogProduct(idOrSlug: string): Promise<CatalogProduct | null> {
@@ -116,7 +129,6 @@ export async function getProductImageBuffer(productId: string): Promise<{ data: 
     })
     const href = product.images?.meta?.href
     if (!href) {
-      // try variant
       const variant = await msFetch<MsProduct>(`/entity/variant/${productId}`).catch(() => null)
       if (!variant?.images?.meta?.href) return null
       return downloadFirstImage(variant.images.meta.href)
@@ -149,8 +161,7 @@ async function downloadFirstImage(imagesHref: string): Promise<{ data: ArrayBuff
   }
 }
 
-function getDemoCatalog(): CatalogProduct[] {
-  const stores = getStoreConfigs()
+function getDemoCatalog(stores: StoreConfig[]): CatalogProduct[] {
   const demo = [
     { name: 'Жидкость Classic Tobacco 30 мл', category: 'Жидкости', price: 890, s: [12, 4, 0] },
     { name: 'Под-система Compact Pro', category: 'Устройства', price: 2490, s: [3, 5, 2] },
