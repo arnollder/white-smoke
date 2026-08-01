@@ -9,6 +9,8 @@ export default defineNuxtConfig({
   fonts: {
     families: [
       { name: 'Alice', provider: 'google', weights: [400] },
+      // Condensed modern display — fits vape/street shop energy, Cyrillic included
+      { name: 'Unbounded', provider: 'google', weights: [400, 500, 600, 700] },
       {
         name: 'Agretta Hills Cyrillic',
         provider: 'local',

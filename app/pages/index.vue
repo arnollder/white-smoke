@@ -22,7 +22,7 @@ const { data: stores } = await useFetch('/api/stores')
         <p class="ws-animate-rise text-sm font-medium uppercase tracking-[0.2em] text-mist-400">
           Дзержинск
         </p>
-        <h1 class="ws-animate-rise-delay font-display mt-4 max-w-3xl text-5xl leading-[0.95] tracking-tight text-white sm:text-7xl lg:text-8xl">
+        <h1 class="ws-animate-rise-delay font-display mt-4 max-w-3xl text-5xl font-semibold leading-[0.95] tracking-tight text-white sm:text-7xl lg:text-8xl">
           White Smoke
         </h1>
         <p class="ws-animate-rise-delay-2 mt-6 max-w-lg text-lg text-smoke-300 sm:text-xl">

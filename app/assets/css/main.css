@@ -3,7 +3,8 @@
 
 @theme static {
   --font-sans: 'Alice', ui-serif, Georgia, serif;
-  --font-display: 'Agretta Hills Cyrillic', 'Alice', ui-serif, Georgia, serif;
+  --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
+  --font-logo: 'Agretta Hills Cyrillic', 'Alice', ui-serif, Georgia, serif;
 
   --color-smoke-50: #f7f8f8;
   --color-smoke-100: #eef0f1;
@@ -48,6 +49,13 @@ body {
 
 .font-display {
   font-family: var(--font-display);
+  font-weight: 500;
+  font-synthesis: none;
+  letter-spacing: -0.02em;
+}
+
+.font-logo {
+  font-family: var(--font-logo);
   font-weight: 400;
   font-synthesis: none;
   letter-spacing: 0.01em;

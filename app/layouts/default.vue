@@ -11,7 +11,7 @@ const links = [
   <div class="min-h-dvh flex flex-col bg-[#0c0e10] text-smoke-100">
     <header class="sticky top-0 z-40 border-b border-white/5 bg-[#0c0e10]/80 backdrop-blur-xl">
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <NuxtLink to="/" class="heder-logo font-display text-lg tracking-tight text-white sm:text-xl">
+        <NuxtLink to="/" class="heder-logo font-logo text-lg tracking-tight text-white sm:text-xl">
           <p class="logo-up">
             White
           </p>
