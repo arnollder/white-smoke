@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Syne', ui-sans-serif, system-ui, sans-serif;
+
+  --color-smoke-50: #f7f8f8;
+  --color-smoke-100: #eef0f1;
+  --color-smoke-200: #d9dde0;
+  --color-smoke-300: #b8c0c5;
+  --color-smoke-400: #909ca4;
+  --color-smoke-500: #738088;
+  --color-smoke-600: #5d6970;
+  --color-smoke-700: #4c555b;
+  --color-smoke-800: #41494e;
+  --color-smoke-900: #393f43;
+  --color-smoke-950: #1a1d1f;
+
+  --color-mist-50: #f0fdfa;
+  --color-mist-100: #ccfbf1;
+  --color-mist-200: #99f6e4;
+  --color-mist-300: #5eead4;
+  --color-mist-400: #2dd4bf;
+  --color-mist-500: #14b8a6;
+  --color-mist-600: #0d9488;
+  --color-mist-700: #0f766e;
+  --color-mist-800: #115e59;
+  --color-mist-900: #134e4a;
+  --color-mist-950: #042f2e;
+}
+
+:root {
+  --ws-hero-glow: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(45, 212, 191, 0.12), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(238, 240, 241, 0.06), transparent 50%),
+    linear-gradient(180deg, #0c0e10 0%, #1a1d1f 45%, #121416 100%);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #0c0e10;
+  color: var(--color-smoke-100);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+@keyframes ws-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ws-haze {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translateY(-12px) scale(1.04);
+  }
+}
+
+@keyframes ws-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ws-animate-rise {
+  animation: ws-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ws-animate-rise-delay {
+  animation: ws-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.ws-animate-rise-delay-2 {
+  animation: ws-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+.ws-haze {
+  animation: ws-haze 8s ease-in-out infinite;
+}
+
+.ws-fade-in {
+  animation: ws-fade-in 0.5s ease both;
+}

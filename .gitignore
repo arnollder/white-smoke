@@ -1,0 +1,21 @@
+# Dependencies
+node_modules
+.nuxt
+.output
+.data
+.cache
+dist
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs / OS
+*.log
+.DS_Store
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
