@@ -5,20 +5,24 @@ const { data: stores } = await useFetch('/api/stores')
 <template>
   <div>
     <!-- Hero -->
-    <section class="relative min-h-[100dvh] overflow-hidden" style="background: var(--ws-hero-glow)">
-      <div
-        class="pointer-events-none absolute inset-0 ws-haze"
-        aria-hidden="true"
-      >
-        <div class="absolute -left-1/4 top-1/4 h-[50vh] w-[70vw] rounded-full bg-white/[0.03] blur-3xl" />
-        <div class="absolute right-0 top-0 h-[40vh] w-[50vw] rounded-full bg-mist-500/10 blur-3xl" />
+    <section class="relative min-h-[100dvh] overflow-hidden bg-[#0c0e10]">
+      <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+        <img
+          src="/images/smoke-bg.jpeg"
+          alt=""
+          class="absolute inset-0 h-full w-full object-cover object-center opacity-[0.18] saturate-50 blur-[2px] scale-105 ws-haze"
+        >
+        <div
+          class="absolute inset-0"
+          style="background: linear-gradient(180deg, rgba(12,14,16,0.55) 0%, rgba(12,14,16,0.72) 45%, rgba(12,14,16,0.92) 100%), radial-gradient(ellipse 70% 50% at 50% 40%, rgba(45,212,191,0.06), transparent 65%)"
+        />
       </div>
 
       <div class="relative mx-auto flex min-h-[100dvh] max-w-6xl flex-col justify-center px-4 pb-24 pt-10 sm:px-6">
         <p class="ws-animate-rise text-sm font-medium uppercase tracking-[0.2em] text-mist-400">
           Дзержинск
         </p>
-        <h1 class="ws-animate-rise-delay font-display mt-4 max-w-3xl text-5xl font-extrabold leading-[0.95] tracking-tight text-white sm:text-7xl lg:text-8xl">
+        <h1 class="ws-animate-rise-delay font-display mt-4 max-w-3xl text-5xl leading-[0.95] tracking-tight text-white sm:text-7xl lg:text-8xl">
           White Smoke
         </h1>
         <p class="ws-animate-rise-delay-2 mt-6 max-w-lg text-lg text-smoke-300 sm:text-xl">
@@ -45,7 +49,7 @@ const { data: stores } = await useFetch('/api/stores')
     <!-- Stores teaser -->
     <section class="border-t border-white/5 bg-smoke-950/50 py-20">
       <div class="mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 class="font-display text-3xl font-bold text-white sm:text-4xl">
+        <h2 class="font-display text-3xl text-white sm:text-4xl">
           Заберите там, где удобно
         </h2>
         <p class="mt-3 max-w-xl text-smoke-400">
@@ -59,7 +63,7 @@ const { data: stores } = await useFetch('/api/stores')
             class="ws-fade-in border-t border-mist-500/30 pt-6"
             :style="{ animationDelay: `${index * 0.1}s` }"
           >
-            <h3 class="font-display text-xl font-semibold text-white">
+            <h3 class="font-display text-xl text-white">
               {{ store.name }}
             </h3>
             <p class="mt-2 text-sm text-smoke-400">

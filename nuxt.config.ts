@@ -8,8 +8,13 @@ export default defineNuxtConfig({
   },
   fonts: {
     families: [
-      { name: 'Syne', provider: 'google', weights: [600, 700, 800] },
-      { name: 'DM Sans', provider: 'google', weights: [400, 500, 600, 700] }
+      { name: 'Alice', provider: 'google', weights: [400] },
+      {
+        name: 'Agretta Hills Cyrillic',
+        provider: 'local',
+        weights: [400],
+        global: true
+      }
     ]
   },
   runtimeConfig: {
