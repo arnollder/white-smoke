@@ -1,10 +1,68 @@
 <script setup lang="ts">
+const route = useRoute()
 const { cartCount } = useCart()
 
 const links = [
-  { label: 'Витрина', to: '/#catalog' },
-  { label: 'Магазины', to: '/#stores' }
-]
+  { label: 'Витрина', to: '/#catalog', hash: 'catalog' },
+  { label: 'Магазины', to: '/#stores', hash: 'stores' }
+] as const
+
+const activeHash = ref('')
+let sectionObserver: IntersectionObserver | null = null
+
+function syncActiveFromRoute() {
+  const h = String(route.hash || '').replace(/^#/, '')
+  if (h) {
+    activeHash.value = h
+    return
+  }
+  if (route.path !== '/') {
+    activeHash.value = ''
+  }
+}
+
+function teardownObserver() {
+  sectionObserver?.disconnect()
+  sectionObserver = null
+}
+
+function setupObserver() {
+  teardownObserver()
+  if (!import.meta.client || route.path !== '/') return
+
+  const ids = links.map(l => l.hash)
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+      const top = visible[0]
+      if (top?.target?.id) {
+        activeHash.value = top.target.id
+      }
+    },
+    {
+      rootMargin: '-20% 0px -55% 0px',
+      threshold: [0, 0.25, 0.5]
+    }
+  )
+
+  for (const id of ids) {
+    const el = document.getElementById(id)
+    if (el) sectionObserver.observe(el)
+  }
+}
+
+watch(() => [route.path, route.hash], () => {
+  syncActiveFromRoute()
+  nextTick(setupObserver)
+}, { immediate: true })
+
+onBeforeUnmount(teardownObserver)
+
+function isActive(hash: string) {
+  return activeHash.value === hash
+}
 </script>
 
 <template>
@@ -20,17 +78,17 @@ const links = [
           </p>
         </NuxtLink>
 
-        <nav class="hidden items-center gap-1 sm:flex">
-          <UButton
+        <nav class="ws-nav hidden items-center gap-8 sm:flex" aria-label="Основная">
+          <NuxtLink
             v-for="link in links"
             :key="link.to"
             :to="link.to"
-            variant="ghost"
-            color="neutral"
-            class="nav-button text-smoke-300 hover:text-white"
+            class="ws-nav-link font-display"
+            :class="{ 'is-active': isActive(link.hash) }"
           >
-            {{ link.label }}
-          </UButton>
+            <span class="ws-nav-label">{{ link.label }}</span>
+            <span class="ws-nav-line" aria-hidden="true" />
+          </NuxtLink>
         </nav>
 
         <div class="flex items-center gap-2">
@@ -42,12 +100,13 @@ const links = [
             :label="cartCount ? String(cartCount) : undefined"
             aria-label="Корзина"
           />
-          <UButton
+          <NuxtLink
             to="/#catalog"
-            class="hidden sm:inline-flex"
-            label="В витрину"
-            trailing-icon="i-lucide-arrow-right"
-          />
+            class="ws-nav-cta hidden sm:inline-flex"
+          >
+            В витрину
+            <UIcon name="i-lucide-arrow-up-right" class="size-4" />
+          </NuxtLink>
         </div>
       </div>
     </header>
@@ -94,9 +153,74 @@ const links = [
   border-radius: 1rem 7rem 2rem 3rem;
 }
 
-.nav-button {
-  text-transform: uppercase;  
-  font-size: 1rem;
-  letter-spacing: 0.1em;
+.ws-nav-link {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  color: var(--color-smoke-400);
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+
+.ws-nav-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  transition: letter-spacing 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-nav-line {
+  display: block;
+  height: 1px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--color-mist-400), transparent 85%);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-nav-link:hover,
+.ws-nav-link.is-active {
+  color: #fff;
+}
+
+.ws-nav-link:hover .ws-nav-label,
+.ws-nav-link.is-active .ws-nav-label {
+  letter-spacing: 0.28em;
+  transform: translateX(1px);
+}
+
+.ws-nav-link:hover .ws-nav-line,
+.ws-nav-link.is-active .ws-nav-line {
+  transform: scaleX(1);
+}
+
+.ws-nav-cta {
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-smoke-200);
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ws-nav-cta:hover {
+  color: #fff;
+  border-color: rgba(45, 212, 191, 0.45);
+  background-color: rgba(45, 212, 191, 0.08);
+  transform: translateY(-1px);
 }
 </style>
