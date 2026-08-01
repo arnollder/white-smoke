@@ -88,7 +88,7 @@ useSeoMeta({
 
 <template>
   <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-    <h1 class="font-display text-4xl font-bold text-white sm:text-5xl">
+    <h1 class="font-display text-4xl text-white sm:text-5xl">
       Корзина
     </h1>
 

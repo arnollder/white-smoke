@@ -13,7 +13,7 @@ useSeoMeta({
     <div class="flex size-16 items-center justify-center rounded-full bg-mist-500/15 text-mist-400">
       <UIcon name="i-lucide-check" class="size-8" />
     </div>
-    <h1 class="font-display mt-8 text-3xl font-bold text-white sm:text-4xl">
+    <h1 class="font-display mt-8 text-3xl text-white sm:text-4xl">
       Готово
     </h1>
     <p class="mt-4 text-smoke-400">

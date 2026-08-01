@@ -11,8 +11,13 @@ const links = [
   <div class="min-h-dvh flex flex-col bg-[#0c0e10] text-smoke-100">
     <header class="sticky top-0 z-40 border-b border-white/5 bg-[#0c0e10]/80 backdrop-blur-xl">
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <NuxtLink to="/" class="font-display text-lg tracking-tight text-white sm:text-xl">
-          White Smoke
+        <NuxtLink to="/" class="heder-logo font-display text-lg tracking-tight text-white sm:text-xl">
+          <p class="logo-up">
+            White
+          </p>
+          <p class="logo-down">
+            Smoke
+          </p>
         </NuxtLink>
 
         <nav class="hidden items-center gap-1 sm:flex">
@@ -22,7 +27,7 @@ const links = [
             :to="link.to"
             variant="ghost"
             color="neutral"
-            class="text-smoke-300 hover:text-white"
+            class="nav-button text-smoke-300 hover:text-white"
           >
             {{ link.label }}
           </UButton>
@@ -70,3 +75,30 @@ const links = [
     </footer>
   </div>
 </template>
+
+<style scoped>
+.logo-up {
+  transform: translate(0, 0.7rem);
+
+}
+.logo-down {
+  transform: translate(1.2rem, -0.7rem);
+}
+
+.heder-logo {
+  padding: 0 3rem 0.1rem 0.5rem;
+  
+  transform: translate(0, 1.8rem);
+
+  font-size: 2rem;  
+  /* border: 1px double; */
+  border-radius: 1rem 2rem 7rem 3rem;
+}
+
+.nav-button {
+  padding-right: 2rem;
+  text-transform: uppercase;  
+  font-size: 2rem;  
+
+}
+</style>

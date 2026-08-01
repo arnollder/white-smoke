@@ -44,7 +44,7 @@ function formatPrice(value: number) {
       <p v-if="product.category" class="text-xs uppercase tracking-wider text-mist-500/80">
         {{ product.category }}
       </p>
-      <h3 class="font-display text-base font-semibold leading-snug text-white group-hover:text-mist-200">
+      <h3 class="font-display text-base leading-snug text-white group-hover:text-mist-200">
         {{ product.name }}
       </h3>
       <p class="mt-auto pt-2 text-lg font-semibold text-white">
