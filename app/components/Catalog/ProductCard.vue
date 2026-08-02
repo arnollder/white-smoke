@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import type { CatalogProduct } from '#shared/types/catalog'
 
-defineProps<{
+const props = defineProps<{
   product: CatalogProduct
 }>()
+
+const toast = useToast()
+const { addItem } = useCart()
+const quantity = ref(1)
+
+const maxQty = computed(() => Math.max(1, props.product.totalStock))
+
+watch(maxQty, (max) => {
+  if (quantity.value > max) quantity.value = max
+})
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat('ru-RU', {
@@ -12,14 +22,44 @@ function formatPrice(value: number) {
     maximumFractionDigits: 0
   }).format(value)
 }
+
+function addToCart(e: Event) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (props.product.totalStock <= 0) {
+    toast.add({ title: 'Нет в наличии', color: 'error' })
+    return
+  }
+
+  const qty = Math.min(Math.max(1, quantity.value), maxQty.value)
+
+  addItem({
+    id: props.product.id,
+    slug: props.product.slug,
+    name: props.product.name,
+    price: props.product.price,
+    imageUrl: props.product.imageUrl
+  }, qty)
+
+  toast.add({
+    title: 'В корзине',
+    description: `${props.product.name} × ${qty}`,
+    color: 'success',
+    actions: [{
+      label: 'К корзине',
+      onClick: () => navigateTo('/cart')
+    }]
+  })
+}
 </script>
 
 <template>
-  <NuxtLink
-    :to="`/catalog/${product.slug}`"
-    class="group flex flex-col overflow-hidden border border-white/5 bg-smoke-950/40 transition duration-300 hover:border-mist-500/30 hover:bg-smoke-950/80"
-  >
-    <div class="relative aspect-[4/3] overflow-hidden bg-smoke-900/50">
+  <article class="group flex flex-col overflow-hidden border border-white/5 bg-smoke-950/40 transition duration-300 hover:border-mist-500/30 hover:bg-smoke-950/80">
+    <NuxtLink
+      :to="`/catalog/${product.slug}`"
+      class="relative aspect-[4/3] overflow-hidden bg-smoke-900/50"
+    >
       <img
         v-if="product.imageUrl"
         :src="product.imageUrl"
@@ -39,20 +79,41 @@ function formatPrice(value: number) {
       >
         Нет в наличии
       </span>
-    </div>
+    </NuxtLink>
+
     <div class="flex flex-1 flex-col gap-2 p-4">
-      <p v-if="product.category" class="text-xs uppercase tracking-wider text-mist-500/80">
-        {{ product.category }}
-      </p>
-      <h3 class="font-display text-base leading-snug text-white group-hover:text-mist-200">
-        {{ product.name }}
-      </h3>
-      <p class="mt-auto pt-2 text-lg font-semibold text-white">
-        {{ formatPrice(product.price) }}
-      </p>
-      <p class="text-xs text-smoke-500">
-        В наличии: {{ product.totalStock }} шт.
-      </p>
+      <NuxtLink :to="`/catalog/${product.slug}`" class="flex flex-1 flex-col gap-2">
+        <p v-if="product.category" class="text-xs uppercase tracking-wider text-mist-500/80">
+          {{ product.category }}
+        </p>
+        <h3 class="font-display text-base leading-snug text-white transition group-hover:text-mist-200">
+          {{ product.name }}
+        </h3>
+        <p class="mt-auto pt-2 text-lg font-semibold text-white">
+          {{ formatPrice(product.price) }}
+        </p>
+        <p class="text-xs text-smoke-500">
+          В наличии: {{ product.totalStock }} шт.
+        </p>
+      </NuxtLink>
+
+      <div class="mt-3 flex items-center gap-2">
+        <UInputNumber
+          v-model="quantity"
+          :min="1"
+          :max="maxQty"
+          :disabled="product.totalStock <= 0"
+          class="w-24 shrink-0"
+          @click.stop
+        />
+        <UButton
+          class="min-w-0 flex-1"
+          icon="i-lucide-shopping-bag"
+          label="В корзину"
+          :disabled="product.totalStock <= 0"
+          @click="addToCart"
+        />
+      </div>
     </div>
-  </NuxtLink>
+  </article>
 </template>
