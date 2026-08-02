@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { CatalogProduct } from '#shared/types/catalog'
-
 const route = useRoute()
 const toast = useToast()
 const { addItem } = useCart()
 
 const slug = computed(() => String(route.params.slug))
 
-const { data: product, error, pending } = await useFetch<CatalogProduct>(
-  () => `/api/catalog/${slug.value}`
+const { data: catalog, pending } = await useCatalogData()
+
+const product = computed(() =>
+  catalog.value?.products.find(p => p.slug === slug.value || p.id === slug.value) || null
 )
 
 const quantity = ref(1)
@@ -74,7 +74,7 @@ function formatPrice(value: number) {
       </div>
     </div>
 
-    <div v-else-if="error || !product" class="py-20 text-center text-smoke-400">
+    <div v-else-if="!product" class="py-20 text-center text-smoke-400">
       Товар не найден
     </div>
 

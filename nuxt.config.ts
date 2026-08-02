@@ -27,10 +27,14 @@ export default defineNuxtConfig({
     moyskladStore3Id: process.env.MOYSKLAD_STORE_3_ID || process.env.NUXT_MOYSKLAD_STORE_3_ID || '',
     public: {
       siteName: 'White Smoke',
-      city: 'Дзержинск'
+      city: 'Дзержинск',
+      /** GitHub Pages / static hosting — no live Nitro API */
+      staticHosting: process.env.NUXT_PUBLIC_STATIC_HOSTING === '1'
     }
   },
   app: {
+    // Set NUXT_APP_BASE_URL=/white-smoke/ for project Pages
+    baseURL: process.env.NUXT_APP_BASE_URL || '/',
     head: {
       title: 'White Smoke — вейп и табак в Дзержинске',
       htmlAttrs: { lang: 'ru' },
@@ -41,6 +45,27 @@ export default defineNuxtConfig({
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
       ]
+    }
+  },
+  nitro: {
+    prerender: {
+      crawlLinks: true,
+      routes: ['/', '/catalog', '/stores', '/cart', '/api/catalog', '/api/stores']
+    }
+  },
+  hooks: {
+    async 'prerender:routes'(ctx) {
+      try {
+        const { getCatalogProducts } = await import('./server/utils/catalog')
+        const products = await getCatalogProducts()
+        for (const p of products) {
+          ctx.routes.add(`/catalog/${p.slug}`)
+          ctx.routes.add(`/api/catalog/${p.id}`)
+          ctx.routes.add(`/api/catalog/${p.slug}`)
+        }
+      } catch (err) {
+        console.warn('[prerender] catalog routes skipped:', err)
+      }
     }
   }
 })

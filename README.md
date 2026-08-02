@@ -38,6 +38,16 @@ npm run dev
 | `npm run build` | Сборка |
 | `npm run preview` | Превью production-сборки |
 
+## GitHub Pages (демо)
+
+Статический демо-сайт: [arnollder.github.io/white-smoke](https://arnollder.github.io/white-smoke/).
+
+- Workflow: `.github/workflows/deploy-pages.yml` (push в `main` или **Run workflow**)
+- Без секретов собирается **демо-каталог**; для витрины из МойСклад добавьте в repo secrets: `MOYSKLAD_TOKEN`, `MOYSKLAD_ORGANIZATION_ID`, `MOYSKLAD_STORE_*_ID`
+- На Pages нет серверного API: заказ покупателя не создаётся (корзина для демонстрации UX)
+
+В настройках репозитория: **Settings → Pages → Source: GitHub Actions**.
+
 ## Возраст 18+
 
 При первом визите показывается подтверждение возраста (localStorage).

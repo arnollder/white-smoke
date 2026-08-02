@@ -3,6 +3,7 @@ import type { CatalogProduct } from '#shared/types/catalog'
 
 const route = useRoute()
 const router = useRouter()
+const config = useRuntimeConfig()
 
 /** Sentinel — SelectItem forbids empty-string values. */
 const ALL = 'all'
@@ -12,23 +13,8 @@ const category = ref(String(route.query.category || ALL))
 const store = ref(String(route.query.store || ALL))
 const inStock = ref(route.query.inStock !== '0')
 
-const queryParams = computed(() => ({
-  q: q.value || undefined,
-  category: category.value !== ALL ? category.value : undefined,
-  store: store.value !== ALL ? store.value : undefined,
-  inStock: inStock.value ? '1' : '0'
-}))
-
-const { data, pending, refresh } = await useFetch<{
-  products: CatalogProduct[]
-  categories: string[]
-  total: number
-}>('/api/catalog', {
-  query: queryParams,
-  watch: [queryParams]
-})
-
-const { data: stores } = await useFetch('/api/stores')
+const { data, pending, refresh } = await useCatalogData()
+const { data: stores } = await useFetch('/api/stores', { key: 'stores-all' })
 
 const storeOptions = computed(() => [
   { label: 'Все магазины', value: ALL },
@@ -39,6 +25,34 @@ const categoryOptions = computed(() => [
   { label: 'Все категории', value: ALL },
   ...(data.value?.categories || []).map(c => ({ label: c, value: c }))
 ])
+
+const filteredProducts = computed(() => {
+  let list: CatalogProduct[] = data.value?.products || []
+  const search = q.value.trim().toLowerCase()
+
+  if (category.value !== ALL) {
+    list = list.filter(p => p.category === category.value)
+  }
+
+  if (store.value !== ALL) {
+    list = list.filter((p) => {
+      const s = p.stocks.find(x => x.storeSlug === store.value)
+      return (s?.stock ?? 0) > 0
+    })
+  } else if (inStock.value) {
+    list = list.filter(p => p.totalStock > 0)
+  }
+
+  if (search) {
+    list = list.filter(p =>
+      p.name.toLowerCase().includes(search)
+      || p.article.toLowerCase().includes(search)
+      || (p.description || '').toLowerCase().includes(search)
+    )
+  }
+
+  return list
+})
 
 watch([q, category, store, inStock], () => {
   router.replace({
@@ -100,6 +114,7 @@ useSeoMeta({
         Только в наличии
       </label>
       <UButton
+        v-if="!config.public.staticHosting"
         color="neutral"
         variant="ghost"
         icon="i-lucide-refresh-cw"
@@ -109,7 +124,7 @@ useSeoMeta({
     </div>
 
     <p class="mt-6 text-sm text-smoke-500">
-      Найдено: {{ data?.total ?? 0 }}
+      Найдено: {{ filteredProducts.length }}
     </p>
 
     <div v-if="pending && !data" class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -121,11 +136,11 @@ useSeoMeta({
     </div>
 
     <div
-      v-else-if="data?.products?.length"
+      v-else-if="filteredProducts.length"
       class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
     >
       <CatalogProductCard
-        v-for="product in data.products"
+        v-for="product in filteredProducts"
         :key="product.id"
         :product="product"
       />

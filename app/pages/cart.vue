@@ -3,10 +3,11 @@ import type { FulfillmentType, OrderResponse, PublicStore } from '#shared/types/
 
 const { items, cartTotal, setQuantity, removeItem, clearCart, load } = useCart()
 const toast = useToast()
+const config = useRuntimeConfig()
 
 onMounted(load)
 
-const { data: stores } = await useFetch<PublicStore[]>('/api/stores')
+const { data: stores } = await useFetch<PublicStore[]>('/api/stores', { key: 'stores-all' })
 
 const fulfillment = ref<FulfillmentType>('pickup')
 const storeSlug = ref('')
@@ -49,6 +50,15 @@ async function submitOrder() {
   }
   if (fulfillment.value === 'delivery' && !address.value.trim()) {
     toast.add({ title: 'Укажите адрес в Дзержинске', color: 'error' })
+    return
+  }
+
+  if (config.public.staticHosting) {
+    toast.add({
+      title: 'Демо на GitHub Pages',
+      description: 'Оформление заказа доступно на полном сервере с API МойСклад.',
+      color: 'warning'
+    })
     return
   }
 

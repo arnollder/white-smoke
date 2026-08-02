@@ -1,0 +1,63 @@
+# https://nuxt.com/deploy/github-pages
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - cursor/restore-catalog-stores-pages
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build static site
+        env:
+          NUXT_APP_BASE_URL: /white-smoke/
+          NUXT_PUBLIC_STATIC_HOSTING: "1"
+          # Optional: bake live MoySklad catalog into the static build
+          MOYSKLAD_TOKEN: ${{ secrets.MOYSKLAD_TOKEN }}
+          MOYSKLAD_ORGANIZATION_ID: ${{ secrets.MOYSKLAD_ORGANIZATION_ID }}
+          MOYSKLAD_STORE_1_ID: ${{ secrets.MOYSKLAD_STORE_1_ID }}
+          MOYSKLAD_STORE_2_ID: ${{ secrets.MOYSKLAD_STORE_2_ID }}
+          MOYSKLAD_STORE_3_ID: ${{ secrets.MOYSKLAD_STORE_3_ID }}
+          STORE_1_NAME: ${{ vars.STORE_1_NAME }}
+          STORE_2_NAME: ${{ vars.STORE_2_NAME }}
+          STORE_3_NAME: ${{ vars.STORE_3_NAME }}
+        run: npx nuxt build --preset github_pages
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .output/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
