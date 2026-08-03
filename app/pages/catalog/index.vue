@@ -44,6 +44,16 @@ const products = computed<CatalogProduct[]>(() => data.value?.products || [])
 const total = computed(() => data.value?.total ?? 0)
 const pageCount = computed(() => data.value?.pageCount ?? 1)
 
+const listTop = ref<HTMLElement | null>(null)
+
+function scrollToListTop() {
+  if (!import.meta.client) return
+  nextTick(() => {
+    // 'instant' overrides html { scroll-behavior: smooth }
+    listTop.value?.scrollIntoView({ behavior: 'instant', block: 'start' })
+  })
+}
+
 watch([q, category, store, inStock], () => {
   page.value = 1
 })
@@ -63,6 +73,10 @@ watch([q, category, store, inStock, page], () => {
 watch(() => route.query.page, (value) => {
   const next = Math.max(1, Number(value || 1) || 1)
   if (next !== page.value) page.value = next
+})
+
+watch(page, (next, prev) => {
+  if (prev !== undefined && next !== prev) scrollToListTop()
 })
 
 function goPrev() {
@@ -141,7 +155,7 @@ useSeoMeta({
       />
     </div>
 
-    <p class="mt-6 text-sm text-smoke-500">
+    <p ref="listTop" class="mt-6 scroll-mt-24 text-sm text-smoke-500">
       Найдено: {{ total }}
       <span v-if="pageCount > 1"> · страница {{ data?.page || page }} из {{ pageCount }}</span>
     </p>
