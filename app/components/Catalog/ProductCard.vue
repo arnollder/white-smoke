@@ -97,7 +97,7 @@ function addToCart(e: Event) {
         </p>
       </NuxtLink>
 
-      <div class="mt-3 flex items-center gap-2">
+      <div class="mt-3 flex items-center justify-end gap-2">
         <UInputNumber
           v-model="quantity"
           :min="1"
@@ -107,7 +107,7 @@ function addToCart(e: Event) {
           @click.stop
         />
         <UButton
-          class="min-w-0 flex-1"
+          class="w-auto shrink-0"
           icon="i-lucide-shopping-bag"
           label="В корзину"
           :disabled="product.totalStock <= 0"
