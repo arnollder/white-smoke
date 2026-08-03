@@ -28,8 +28,23 @@ export function useCatalogPage(query: MaybeRefOrGetter<CatalogQuery>) {
     }
   })
 
+  // Key must include page/filters — a static key keeps returning page 1 payload.
+  const key = computed(() => {
+    const p = params.value
+    return [
+      'catalog-page',
+      p.page,
+      p.pageSize,
+      p.q || '',
+      p.category || '',
+      p.store || '',
+      p.inStock,
+      p.refresh || ''
+    ].join(':')
+  })
+
   return useFetch<CatalogListResponse>('/api/catalog', {
-    key: 'catalog-page',
+    key,
     query: params,
     watch: [params]
   })

@@ -65,6 +65,14 @@ watch(() => route.query.page, (value) => {
   if (next !== page.value) page.value = next
 })
 
+function goPrev() {
+  if (page.value > 1) page.value -= 1
+}
+
+function goNext() {
+  if (page.value < pageCount.value) page.value += 1
+}
+
 async function hardRefresh() {
   page.value = 1
   forceRefresh.value = true
@@ -176,7 +184,7 @@ useSeoMeta({
         variant="outline"
         label="Назад"
         :disabled="page <= 1 || pending"
-        @click="page = Math.max(1, page - 1)"
+        @click="goPrev"
       />
       <span class="text-sm tabular-nums text-smoke-400">
         {{ data?.page || page }} / {{ pageCount }}
@@ -186,7 +194,7 @@ useSeoMeta({
         variant="outline"
         label="Вперёд"
         :disabled="page >= pageCount || pending"
-        @click="page = Math.min(pageCount, page + 1)"
+        @click="goNext"
       />
     </div>
   </div>
