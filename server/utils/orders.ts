@@ -8,7 +8,7 @@ import {
   type MsCustomerOrder
 } from './moysklad'
 import { findStoreBySlug, getDeliveryStore, type StoreConfig } from './stores'
-import { getCatalogProducts } from './catalog'
+import { getCatalogProducts, invalidateCatalogCache } from './catalog'
 
 /** Prefer env org UUID when valid; otherwise first non-archived organization. */
 async function resolveOrganizationId(): Promise<string> {
@@ -149,7 +149,8 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
     throw createError({ statusCode: 400, statusMessage: 'Корзина пуста' })
   }
 
-  const catalog = await getCatalogProducts()
+  // Live stocks (net of reserve) — do not trust a stale catalog snapshot at checkout
+  const catalog = await getCatalogProducts({ force: true })
   const byId = new Map(catalog.map(p => [p.id, p]))
 
   const positions: Array<{
@@ -213,6 +214,10 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
         positions
       }
     })
+
+    // Reserved qty must leave the storefront immediately
+    invalidateCatalogCache()
+    void getCatalogProducts({ force: true }).catch(() => {})
 
     return {
       id: order.id,

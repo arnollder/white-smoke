@@ -4,7 +4,11 @@ import { catalogCategories, filterCatalogProducts, getCatalogProducts } from '..
 const DEFAULT_PAGE_SIZE = 24
 const MAX_PAGE_SIZE = 100
 
-export default defineCachedEventHandler(async (event): Promise<CatalogListResponse> => {
+/**
+ * No Nitro HTTP cache — stocks must reflect MoySklad reserves promptly.
+ * Freshness is handled by the in-memory catalog snapshot in catalog.ts.
+ */
+export default defineEventHandler(async (event): Promise<CatalogListResponse> => {
   const query = getQuery(event)
   const search = String(query.q || '').trim()
   const category = String(query.category || '').trim()
@@ -46,23 +50,5 @@ export default defineCachedEventHandler(async (event): Promise<CatalogListRespon
     page: safePage,
     pageSize: pageSize === Number.POSITIVE_INFINITY ? total || DEFAULT_PAGE_SIZE : pageSize,
     pageCount
-  }
-}, {
-  maxAge: 60,
-  swr: true,
-  staleMaxAge: 600,
-  getKey: (event) => {
-    const q = getQuery(event)
-    return [
-      'catalog',
-      q.q || '',
-      q.category || '',
-      q.store || '',
-      q.inStock || '',
-      q.page || '1',
-      q.pageSize || '',
-      q.all || '',
-      q.refresh || ''
-    ].join(':')
   }
 })

@@ -171,6 +171,8 @@ async function submitOrder() {
       }
     })
     clearCart()
+    // Drop client catalog payloads so the shop floor shows post-reserve stocks
+    clearNuxtData(key => typeof key === 'string' && key.startsWith('catalog'))
     await navigateTo(`/order/${order.id}?name=${encodeURIComponent(order.name)}`)
   } catch (err: unknown) {
     const e = err as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }

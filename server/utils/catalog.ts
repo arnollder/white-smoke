@@ -50,8 +50,10 @@ function buildStocks(stockRow: MsStockByStoreRow | undefined, stores: StoreConfi
 
   for (const entry of stockRow?.stockByStore || []) {
     const storeId = idFromHref(entry.meta.href)
-    // report/stock/bystore.stock = доступно (без резерва)
-    byId.set(storeId, Math.max(0, Math.floor(entry.stock ?? 0)))
+    // bystore.stock = физ. остаток, reserve = в резерве; витрине нужно «доступно»
+    const onHand = entry.stock ?? 0
+    const reserved = entry.reserve ?? 0
+    byId.set(storeId, Math.max(0, Math.floor(onHand - reserved)))
   }
 
   return stores.map((s) => ({
@@ -128,6 +130,12 @@ function scheduleCatalogRefresh() {
     .finally(() => {
       catalogCache.refreshing = false
     })
+}
+
+/** Drop in-memory snapshot so the next read reloads stocks from MoySklad. */
+export function invalidateCatalogCache() {
+  catalogCache.products = null
+  catalogCache.at = 0
 }
 
 export async function getCatalogProducts(options: { force?: boolean } = {}): Promise<CatalogProduct[]> {
