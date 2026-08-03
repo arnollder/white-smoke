@@ -87,6 +87,24 @@ function goNext() {
   if (page.value < pageCount.value) page.value += 1
 }
 
+/** Draft for the page input — commit on Enter/blur so typing doesn't refetch each digit. */
+const pageInput = ref(String(page.value))
+
+watch(page, (value) => {
+  pageInput.value = String(value)
+})
+
+function commitPageInput() {
+  const raw = Number.parseInt(pageInput.value.replace(/\D/g, ''), 10)
+  if (!Number.isFinite(raw)) {
+    pageInput.value = String(page.value)
+    return
+  }
+  const next = Math.min(pageCount.value, Math.max(1, raw))
+  pageInput.value = String(next)
+  if (next !== page.value) page.value = next
+}
+
 async function hardRefresh() {
   page.value = 1
   forceRefresh.value = true
@@ -157,7 +175,6 @@ useSeoMeta({
 
     <p ref="listTop" class="mt-6 scroll-mt-24 text-sm text-smoke-500">
       Найдено: {{ total }}
-      <span v-if="pageCount > 1"> · страница {{ data?.page || page }} из {{ pageCount }}</span>
     </p>
 
     <p v-if="error" class="mt-4 text-sm text-red-400">
@@ -189,27 +206,118 @@ useSeoMeta({
       <p class="mt-4">Ничего не найдено. Снимите фильтры или обновите витрину.</p>
     </div>
 
-    <div
+    <nav
       v-if="pageCount > 1"
-      class="mt-10 flex flex-wrap items-center justify-center gap-3"
+      class="ws-pager mt-14 flex items-center justify-center gap-1 border-t border-white/5 pt-8"
+      aria-label="Страницы витрины"
     >
-      <UButton
-        color="neutral"
-        variant="outline"
-        label="Назад"
+      <button
+        type="button"
+        class="ws-pager-btn"
         :disabled="page <= 1 || pending"
+        aria-label="Предыдущая страница"
         @click="goPrev"
-      />
-      <span class="text-sm tabular-nums text-smoke-400">
-        {{ data?.page || page }} / {{ pageCount }}
-      </span>
-      <UButton
-        color="neutral"
-        variant="outline"
-        label="Вперёд"
+      >
+        <UIcon name="i-lucide-chevron-left" class="size-5" />
+      </button>
+
+      <div class="ws-pager-jump">
+        <label class="sr-only" for="catalog-page-input">Номер страницы</label>
+        <input
+          id="catalog-page-input"
+          v-model="pageInput"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          autocomplete="off"
+          :disabled="pending"
+          class="ws-pager-input"
+          @keydown.enter.prevent="commitPageInput"
+          @blur="commitPageInput"
+        >
+        <span class="ws-pager-total" aria-hidden="true">/ {{ pageCount }}</span>
+      </div>
+
+      <button
+        type="button"
+        class="ws-pager-btn"
         :disabled="page >= pageCount || pending"
+        aria-label="Следующая страница"
         @click="goNext"
-      />
-    </div>
+      >
+        <UIcon name="i-lucide-chevron-right" class="size-5" />
+      </button>
+    </nav>
   </div>
 </template>
+
+<style scoped>
+.ws-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--color-smoke-400);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.ws-pager-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.ws-pager-btn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.ws-pager-jump {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0 0.35rem;
+  padding: 0 0.25rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.ws-pager-input {
+  width: 3.25rem;
+  height: 2.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #fff;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.ws-pager-input:hover:not(:disabled) {
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.ws-pager-input:focus {
+  border-color: rgba(45, 212, 191, 0.55);
+  background-color: rgba(45, 212, 191, 0.04);
+}
+
+.ws-pager-input:disabled {
+  opacity: 0.45;
+}
+
+.ws-pager-total {
+  min-width: 2.5rem;
+  color: var(--color-smoke-500);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+</style>
