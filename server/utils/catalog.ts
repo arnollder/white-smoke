@@ -12,15 +12,24 @@ import {
 import { resolveStoreConfigs, type StoreConfig } from './stores'
 
 const catalogCache = {
+  /** Last full assortment+stock load. */
   at: 0,
+  /** Last stock/bystore merge (reserves released in MS must show up here). */
+  stockAt: 0,
   products: null as CatalogProduct[] | null,
-  refreshing: false
+  refreshing: false,
+  stockRefreshing: null as Promise<CatalogProduct[]> | null
 }
 
-/** Serve as fresh for this long. */
+/** Assortment (names/prices) served as fresh for this long. */
 const CATALOG_FRESH_MS = 10 * 60_000
 /** After fresh window, still serve snapshot while a background refresh runs. */
 const CATALOG_STALE_MS = 30 * 60_000
+/**
+ * Stocks (incl. free qty after reserve cancel in MoySklad) re-fetched this often.
+ * External MS edits never hit invalidateCatalogCache — short TTL is required.
+ */
+const STOCK_FRESH_MS = 20_000
 
 function priceFromProduct(p: MsProduct | MsAssortmentRow): number {
   const value = p.salePrices?.[0]?.value
@@ -63,7 +72,7 @@ function buildStocks(stockRow: MsStockByStoreRow | undefined, stores: StoreConfi
   }))
 }
 
-async function loadCatalogFromMoySklad(): Promise<CatalogProduct[]> {
+async function resolveCatalogStores(): Promise<StoreConfig[]> {
   const stores = (await resolveStoreConfigs()).filter(s => s.msId)
   if (!stores.length) {
     throw createError({
@@ -71,19 +80,43 @@ async function loadCatalogFromMoySklad(): Promise<CatalogProduct[]> {
       statusMessage: 'Не найдены склады в МойСклад. Проверьте токен или MOYSKLAD_STORE_*_ID'
     })
   }
+  return stores
+}
 
-  // limit=1000 → fewer round-trips; pathName covers category without expand
-  const [assortment, stockRows] = await Promise.all([
-    fetchAllPages<MsAssortmentRow>('/entity/assortment', {
-      filter: 'archived=false'
-    }, 1000),
-    fetchAllPages<MsStockByStoreRow>('/report/stock/bystore', {}, 1000)
-  ])
-
+async function loadStockMap(): Promise<Map<string, MsStockByStoreRow>> {
+  const stockRows = await fetchAllPages<MsStockByStoreRow>('/report/stock/bystore', {}, 1000)
   const stockMap = new Map<string, MsStockByStoreRow>()
   for (const row of stockRows) {
     stockMap.set(idFromHref(row.meta.href), row)
   }
+  return stockMap
+}
+
+function applyStocksToProducts(
+  products: CatalogProduct[],
+  stockMap: Map<string, MsStockByStoreRow>,
+  stores: StoreConfig[]
+): CatalogProduct[] {
+  return products.map((p) => {
+    const stocks = buildStocks(stockMap.get(p.id), stores)
+    return {
+      ...p,
+      stocks,
+      totalStock: stocks.reduce((s, x) => s + x.stock, 0)
+    }
+  })
+}
+
+async function loadCatalogFromMoySklad(): Promise<CatalogProduct[]> {
+  const stores = await resolveCatalogStores()
+
+  // limit=1000 → fewer round-trips; pathName covers category without expand
+  const [assortment, stockMap] = await Promise.all([
+    fetchAllPages<MsAssortmentRow>('/entity/assortment', {
+      filter: 'archived=false'
+    }, 1000),
+    loadStockMap()
+  ])
 
   const products: CatalogProduct[] = []
 
@@ -116,13 +149,19 @@ async function loadCatalogFromMoySklad(): Promise<CatalogProduct[]> {
   return products.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 }
 
+function rememberCatalog(products: CatalogProduct[]) {
+  const now = Date.now()
+  catalogCache.products = products
+  catalogCache.at = now
+  catalogCache.stockAt = now
+}
+
 function scheduleCatalogRefresh() {
   if (catalogCache.refreshing) return
   catalogCache.refreshing = true
   loadCatalogFromMoySklad()
     .then((products) => {
-      catalogCache.products = products
-      catalogCache.at = Date.now()
+      rememberCatalog(products)
     })
     .catch(() => {
       // Keep serving the previous snapshot on background failure
@@ -132,10 +171,45 @@ function scheduleCatalogRefresh() {
     })
 }
 
+/** Re-fetch only stock/bystore and merge into the cached assortment. */
+async function refreshCatalogStocks(): Promise<CatalogProduct[]> {
+  if (catalogCache.stockRefreshing) {
+    return catalogCache.stockRefreshing
+  }
+
+  const run = (async () => {
+    const current = catalogCache.products
+    if (!current?.length) {
+      const products = await loadCatalogFromMoySklad()
+      rememberCatalog(products)
+      return products
+    }
+
+    const [stores, stockMap] = await Promise.all([
+      resolveCatalogStores(),
+      loadStockMap()
+    ])
+    const products = applyStocksToProducts(current, stockMap, stores)
+    catalogCache.products = products
+    catalogCache.stockAt = Date.now()
+    return products
+  })()
+
+  catalogCache.stockRefreshing = run
+  try {
+    return await run
+  } finally {
+    if (catalogCache.stockRefreshing === run) {
+      catalogCache.stockRefreshing = null
+    }
+  }
+}
+
 /** Drop in-memory snapshot so the next read reloads stocks from MoySklad. */
 export function invalidateCatalogCache() {
   catalogCache.products = null
   catalogCache.at = 0
+  catalogCache.stockAt = 0
 }
 
 export async function getCatalogProducts(options: { force?: boolean } = {}): Promise<CatalogProduct[]> {
@@ -148,19 +222,30 @@ export async function getCatalogProducts(options: { force?: boolean } = {}): Pro
   const age = catalogCache.products ? now - catalogCache.at : Infinity
 
   if (!options.force && catalogCache.products) {
-    if (age < CATALOG_FRESH_MS) {
-      return catalogCache.products
-    }
-    if (age < CATALOG_STALE_MS) {
-      scheduleCatalogRefresh()
-      return catalogCache.products
+    if (age >= CATALOG_STALE_MS) {
+      // fall through to blocking full reload
+    } else {
+      if (age >= CATALOG_FRESH_MS) {
+        scheduleCatalogRefresh()
+      }
+
+      const stockAge = now - catalogCache.stockAt
+      if (stockAge < STOCK_FRESH_MS) {
+        return catalogCache.products
+      }
+
+      try {
+        return await refreshCatalogStocks()
+      } catch {
+        // Keep last known stocks if MoySklad stock report fails
+        return catalogCache.products
+      }
     }
   }
 
   try {
     const products = await loadCatalogFromMoySklad()
-    catalogCache.products = products
-    catalogCache.at = Date.now()
+    rememberCatalog(products)
     return products
   } catch (err: unknown) {
     // Hard failure but we still have a snapshot — keep the shop up
