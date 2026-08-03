@@ -6,6 +6,36 @@ export default defineNuxtConfig({
     preference: 'dark',
     fallback: 'dark'
   },
+  /**
+   * Bundle Lucide locally — avoids Iconify API fetches and
+   * "Collection lucide is not found locally" / failed-to-load warnings.
+   */
+  icon: {
+    serverBundle: {
+      collections: ['lucide']
+    },
+    clientBundle: {
+      scan: true,
+      // Dynamic UButton `icon=` props are easy for the scanner to miss
+      icons: [
+        'lucide:arrow-left',
+        'lucide:arrow-right',
+        'lucide:check',
+        'lucide:chevron-down',
+        'lucide:chevron-left',
+        'lucide:chevron-right',
+        'lucide:minus',
+        'lucide:package',
+        'lucide:phone',
+        'lucide:plus',
+        'lucide:refresh-cw',
+        'lucide:search',
+        'lucide:search-x',
+        'lucide:shopping-bag',
+        'lucide:trash-2'
+      ]
+    }
+  },
   fonts: {
     families: [
       { name: 'Alice', provider: 'google', weights: [400] },
