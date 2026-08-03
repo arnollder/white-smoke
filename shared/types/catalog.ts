@@ -55,3 +55,12 @@ export interface OrderResponse {
   storeSlug?: string
   message: string
 }
+
+export interface CatalogListResponse {
+  products: CatalogProduct[]
+  categories: string[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+}

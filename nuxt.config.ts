@@ -50,7 +50,7 @@ export default defineNuxtConfig({
   nitro: {
     prerender: {
       crawlLinks: true,
-      routes: ['/', '/catalog', '/stores', '/cart', '/api/catalog', '/api/stores']
+      routes: ['/', '/catalog', '/stores', '/cart', '/api/catalog?all=1&inStock=0', '/api/stores']
     }
   },
   hooks: {

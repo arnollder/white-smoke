@@ -10,6 +10,6 @@ export default defineEventHandler(async (event) => {
   }
 
   setHeader(event, 'Content-Type', image.contentType)
-  setHeader(event, 'Cache-Control', 'public, max-age=3600')
+  setHeader(event, 'Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
   return image.data
 })

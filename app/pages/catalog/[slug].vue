@@ -1,14 +1,18 @@
 <script setup lang="ts">
+import type { CatalogProduct } from '#shared/types/catalog'
+
 const route = useRoute()
 const toast = useToast()
 const { addItem } = useCart()
 
 const slug = computed(() => String(route.params.slug))
 
-const { data: catalog, pending } = await useCatalogData()
-
-const product = computed(() =>
-  catalog.value?.products.find(p => p.slug === slug.value || p.id === slug.value) || null
+const { data: product, pending } = await useFetch<CatalogProduct>(
+  () => `/api/catalog/${slug.value}`,
+  {
+    key: computed(() => `catalog-product-${slug.value}`),
+    watch: [slug]
+  }
 )
 
 const quantity = ref(1)

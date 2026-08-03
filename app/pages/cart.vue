@@ -10,7 +10,7 @@ onMounted(load)
 const { data: stores } = await useFetch<PublicStore[]>('/api/stores', { key: 'stores-all' })
 const { data: catalog, pending: stockLoading } = await useFetch<{ products: CatalogProduct[] }>('/api/catalog', {
   key: 'cart-catalog-stock',
-  query: { inStock: '0' },
+  query: { all: '1', inStock: '0' },
   default: () => ({ products: [] })
 })
 

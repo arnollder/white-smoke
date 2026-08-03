@@ -7,13 +7,27 @@ const config = useRuntimeConfig()
 
 /** Sentinel — SelectItem forbids empty-string values. */
 const ALL = 'all'
+const PAGE_SIZE = 24
 
 const q = ref(String(route.query.q || ''))
 const category = ref(String(route.query.category || ALL))
 const store = ref(String(route.query.store || ALL))
 const inStock = ref(route.query.inStock !== '0')
+const page = ref(Math.max(1, Number(route.query.page || 1) || 1))
 
-const { data, pending, refresh } = await useCatalogData()
+const forceRefresh = ref(false)
+
+const catalogQuery = computed(() => ({
+  q: q.value.trim() || undefined,
+  category: category.value !== ALL ? category.value : undefined,
+  store: store.value !== ALL ? store.value : undefined,
+  inStock: inStock.value,
+  page: page.value,
+  pageSize: PAGE_SIZE,
+  refresh: forceRefresh.value || undefined
+}))
+
+const { data, pending, refresh, error } = await useCatalogPage(catalogQuery)
 const { data: stores } = await useFetch('/api/stores', { key: 'stores-all' })
 
 const storeOptions = computed(() => [
@@ -26,44 +40,40 @@ const categoryOptions = computed(() => [
   ...(data.value?.categories || []).map(c => ({ label: c, value: c }))
 ])
 
-const filteredProducts = computed(() => {
-  let list: CatalogProduct[] = data.value?.products || []
-  const search = q.value.trim().toLowerCase()
-
-  if (category.value !== ALL) {
-    list = list.filter(p => p.category === category.value)
-  }
-
-  if (store.value !== ALL) {
-    list = list.filter((p) => {
-      const s = p.stocks.find(x => x.storeSlug === store.value)
-      return (s?.stock ?? 0) > 0
-    })
-  } else if (inStock.value) {
-    list = list.filter(p => p.totalStock > 0)
-  }
-
-  if (search) {
-    list = list.filter(p =>
-      p.name.toLowerCase().includes(search)
-      || p.article.toLowerCase().includes(search)
-      || (p.description || '').toLowerCase().includes(search)
-    )
-  }
-
-  return list
-})
+const products = computed<CatalogProduct[]>(() => data.value?.products || [])
+const total = computed(() => data.value?.total ?? 0)
+const pageCount = computed(() => data.value?.pageCount ?? 1)
 
 watch([q, category, store, inStock], () => {
+  page.value = 1
+})
+
+watch([q, category, store, inStock, page], () => {
   router.replace({
     query: {
       ...(q.value ? { q: q.value } : {}),
       ...(category.value !== ALL ? { category: category.value } : {}),
       ...(store.value !== ALL ? { store: store.value } : {}),
-      ...(inStock.value ? {} : { inStock: '0' })
+      ...(inStock.value ? {} : { inStock: '0' }),
+      ...(page.value > 1 ? { page: String(page.value) } : {})
     }
   })
 })
+
+watch(() => route.query.page, (value) => {
+  const next = Math.max(1, Number(value || 1) || 1)
+  if (next !== page.value) page.value = next
+})
+
+async function hardRefresh() {
+  page.value = 1
+  forceRefresh.value = true
+  try {
+    await refresh()
+  } finally {
+    forceRefresh.value = false
+  }
+}
 
 useSeoMeta({
   title: 'Каталог — White Smoke',
@@ -78,7 +88,7 @@ useSeoMeta({
         Витрина
       </h1>
       <p class="mt-3 text-smoke-400">
-        Остатки по трём магазинам в Дзержинске — в реальном времени из МойСклад.
+        Остатки по трём магазинам в Дзержинске — снимок из МойСклад с быстрым кэшем.
       </p>
     </header>
 
@@ -119,15 +129,20 @@ useSeoMeta({
         variant="ghost"
         icon="i-lucide-refresh-cw"
         aria-label="Обновить"
-        @click="refresh()"
+        @click="hardRefresh()"
       />
     </div>
 
     <p class="mt-6 text-sm text-smoke-500">
-      Найдено: {{ filteredProducts.length }}
+      Найдено: {{ total }}
+      <span v-if="pageCount > 1"> · страница {{ data?.page || page }} из {{ pageCount }}</span>
     </p>
 
-    <div v-if="pending && !data" class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <p v-if="error" class="mt-4 text-sm text-red-400">
+      Не удалось загрузить витрину. Попробуйте обновить через несколько секунд.
+    </p>
+
+    <div v-if="pending && !products.length" class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div
         v-for="n in 6"
         :key="n"
@@ -136,11 +151,12 @@ useSeoMeta({
     </div>
 
     <div
-      v-else-if="filteredProducts.length"
+      v-else-if="products.length"
       class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      :class="{ 'opacity-60': pending }"
     >
       <CatalogProductCard
-        v-for="product in filteredProducts"
+        v-for="product in products"
         :key="product.id"
         :product="product"
       />
@@ -149,6 +165,29 @@ useSeoMeta({
     <div v-else class="mt-16 text-center text-smoke-500">
       <UIcon name="i-lucide-search-x" class="mx-auto size-10 opacity-40" />
       <p class="mt-4">Ничего не найдено. Снимите фильтры или обновите витрину.</p>
+    </div>
+
+    <div
+      v-if="pageCount > 1"
+      class="mt-10 flex flex-wrap items-center justify-center gap-3"
+    >
+      <UButton
+        color="neutral"
+        variant="outline"
+        label="Назад"
+        :disabled="page <= 1 || pending"
+        @click="page = Math.max(1, page - 1)"
+      />
+      <span class="text-sm tabular-nums text-smoke-400">
+        {{ data?.page || page }} / {{ pageCount }}
+      </span>
+      <UButton
+        color="neutral"
+        variant="outline"
+        label="Вперёд"
+        :disabled="page >= pageCount || pending"
+        @click="page = Math.min(pageCount, page + 1)"
+      />
     </div>
   </div>
 </template>
