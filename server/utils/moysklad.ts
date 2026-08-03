@@ -23,36 +23,66 @@ function getToken(): string {
   return token
 }
 
+function msErrorMessage(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback
+  const errors = (data as { errors?: Array<{ error?: string, parameter?: string, code?: number }> }).errors
+  if (!Array.isArray(errors) || !errors.length) return fallback
+  return errors
+    .map((item) => {
+      const parts = [item.error, item.parameter ? `(${item.parameter})` : null].filter(Boolean)
+      return parts.join(' ')
+    })
+    .join('; ') || fallback
+}
+
 export async function msFetch<T>(
   path: string,
   options: {
     method?: string
     query?: Record<string, string | number | boolean | undefined>
     body?: unknown
+    retries?: number
   } = {}
 ): Promise<T> {
   const token = getToken()
   const url = path.startsWith('http') ? path : `${MS_BASE}${path.startsWith('/') ? path : `/${path}`}`
+  const retries = options.retries ?? 2
 
-  try {
-    return await $fetch<T>(url, {
-      method: (options.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE',
-      query: options.query,
-      body: options.body as Record<string, unknown> | undefined,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept-Encoding': 'gzip'
+  let lastError: MoySkladError | null = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await $fetch<T>(url, {
+        method: (options.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE',
+        query: options.query,
+        body: options.body as Record<string, unknown> | undefined,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json;charset=utf-8',
+          'Content-Type': 'application/json',
+          'Accept-Encoding': 'gzip'
+        }
+      })
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number, statusMessage?: string, data?: unknown, message?: string }
+      const fallback = e.statusMessage && e.statusMessage !== 'Bad Request'
+        ? e.statusMessage
+        : (e.message || 'Ошибка МойСклад API')
+      lastError = new MoySkladError(
+        msErrorMessage(e.data, fallback),
+        e.statusCode || 502,
+        e.data
+      )
+
+      if (lastError.status === 429 && attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)))
+        continue
       }
-    })
-  } catch (err: unknown) {
-    const e = err as { statusCode?: number, statusMessage?: string, data?: unknown, message?: string }
-    throw new MoySkladError(
-      e.statusMessage || e.message || 'Ошибка МойСклад API',
-      e.statusCode || 502,
-      e.data
-    )
+      throw lastError
+    }
   }
+
+  throw lastError || new MoySkladError('Ошибка МойСклад API', 502)
 }
 
 export function msMeta(type: string, id: string) {

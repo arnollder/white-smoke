@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FulfillmentType, OrderResponse, PublicStore } from '#shared/types/catalog'
+import type { CatalogProduct, FulfillmentType, OrderResponse, PublicStore } from '#shared/types/catalog'
 
 const { items, cartTotal, setQuantity, removeItem, clearCart, load } = useCart()
 const toast = useToast()
@@ -8,6 +8,11 @@ const config = useRuntimeConfig()
 onMounted(load)
 
 const { data: stores } = await useFetch<PublicStore[]>('/api/stores', { key: 'stores-all' })
+const { data: catalog, pending: stockLoading } = await useFetch<{ products: CatalogProduct[] }>('/api/catalog', {
+  key: 'cart-catalog-stock',
+  query: { inStock: '0' },
+  default: () => ({ products: [] })
+})
 
 const fulfillment = ref<FulfillmentType>('pickup')
 const storeSlug = ref('')
@@ -16,15 +21,87 @@ const phone = ref('')
 const address = ref('')
 const comment = ref('')
 const submitting = ref(false)
+const autoPickedStore = ref(false)
+
+const productById = computed(() => {
+  const map = new Map<string, CatalogProduct>()
+  for (const p of catalog.value?.products || []) {
+    map.set(p.id, p)
+  }
+  return map
+})
+
+function stockAtStore(productId: string, slug: string): number | null {
+  const product = productById.value.get(productId)
+  if (!product) return null
+  return product.stocks.find(s => s.storeSlug === slug)?.stock ?? 0
+}
+
+function storeCanFulfill(slug: string): boolean {
+  return items.value.every((item) => {
+    const available = stockAtStore(item.id, slug)
+    if (available == null) return true
+    return available >= item.quantity
+  })
+}
+
+const fulfillmentStoreSlug = computed(() => {
+  if (fulfillment.value === 'pickup') return storeSlug.value
+  // Delivery uses first warehouse (same as server getDeliveryStore)
+  return stores.value?.[0]?.slug || ''
+})
+
+const stockIssues = computed(() => {
+  const slug = fulfillmentStoreSlug.value
+  if (!slug || !items.value.length) return [] as Array<{ name: string, need: number, available: number, storeName: string }>
+
+  const storeName = stores.value?.find(s => s.slug === slug)?.name || slug
+  const issues: Array<{ name: string, need: number, available: number, storeName: string }> = []
+
+  for (const item of items.value) {
+    const available = stockAtStore(item.id, slug)
+    if (available == null) continue
+    if (available < item.quantity) {
+      issues.push({
+        name: item.name,
+        need: item.quantity,
+        available,
+        storeName
+      })
+    }
+  }
+  return issues
+})
+
+const stockReady = computed(() => stockIssues.value.length === 0)
 
 watch(stores, (s) => {
-  if (s?.length && !storeSlug.value) {
-    storeSlug.value = s[0]!.slug
+  if (!s?.length) return
+  if (!storeSlug.value) {
+    const withStock = s.find(store => storeCanFulfill(store.slug))
+    storeSlug.value = withStock?.slug || s[0]!.slug
+    autoPickedStore.value = !!withStock && withStock.slug !== s[0]!.slug
   }
 }, { immediate: true })
 
+watch([items, productById], () => {
+  if (fulfillment.value !== 'pickup' || !stores.value?.length) return
+  if (storeCanFulfill(storeSlug.value)) return
+  const better = stores.value.find(s => storeCanFulfill(s.slug))
+  if (better) {
+    storeSlug.value = better.slug
+    autoPickedStore.value = true
+  }
+}, { deep: true })
+
 const storeItems = computed(() =>
-  (stores.value || []).map(s => ({ label: `${s.name} — ${s.address}`, value: s.slug }))
+  (stores.value || []).map((s) => {
+    const ok = storeCanFulfill(s.slug)
+    return {
+      label: ok ? `${s.name} — ${s.address}` : `${s.name} — нет нужного остатка`,
+      value: s.slug
+    }
+  })
 )
 
 function formatPrice(value: number) {
@@ -33,6 +110,14 @@ function formatPrice(value: number) {
     currency: 'RUB',
     maximumFractionDigits: 0
   }).format(value)
+}
+
+function lineStockHint(itemId: string): string {
+  const slug = fulfillmentStoreSlug.value
+  if (!slug) return ''
+  const available = stockAtStore(itemId, slug)
+  if (available == null) return stockLoading.value ? 'Проверяем остаток…' : ''
+  return `В выбранном магазине: ${available} шт.`
 }
 
 async function submitOrder() {
@@ -50,6 +135,15 @@ async function submitOrder() {
   }
   if (fulfillment.value === 'delivery' && !address.value.trim()) {
     toast.add({ title: 'Укажите адрес в Дзержинске', color: 'error' })
+    return
+  }
+  if (!stockReady.value) {
+    const first = stockIssues.value[0]!
+    toast.add({
+      title: 'Недостаточно в выбранном магазине',
+      description: `«${first.name}»: нужно ${first.need}, доступно ${first.available} в «${first.storeName}»`,
+      color: 'error'
+    })
     return
   }
 
@@ -82,7 +176,7 @@ async function submitOrder() {
     const e = err as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
     toast.add({
       title: 'Не удалось оформить',
-      description: e.data?.statusMessage || e.statusMessage || e.message || 'Ошибка сервера',
+      description: e.data?.statusMessage || e.data?.message || e.statusMessage || e.message || 'Ошибка сервера',
       color: 'error'
     })
   } finally {
@@ -135,6 +229,12 @@ useSeoMeta({
             </NuxtLink>
             <p class="mt-1 text-sm text-smoke-400">
               {{ formatPrice(item.price) }}
+            </p>
+            <p
+              class="mt-1 text-xs"
+              :class="(stockAtStore(item.id, fulfillmentStoreSlug) ?? item.quantity) >= item.quantity ? 'text-smoke-500' : 'text-red-400'"
+            >
+              {{ lineStockHint(item.id) }}
             </p>
             <div class="mt-3 flex flex-wrap items-center gap-3">
               <UInputNumber
@@ -193,7 +293,14 @@ useSeoMeta({
             value-key="value"
             label-key="label"
             placeholder="Магазин"
+            @update:model-value="autoPickedStore = false"
           />
+          <p
+            v-if="fulfillment === 'pickup' && autoPickedStore && stockReady"
+            class="text-xs text-mist-500"
+          >
+            Выбран магазин, где есть весь заказ
+          </p>
           <UInput
             v-if="fulfillment === 'delivery'"
             v-model="address"
@@ -204,10 +311,22 @@ useSeoMeta({
           <UTextarea v-model="comment" placeholder="Комментарий (необязательно)" :rows="2" />
         </div>
 
+        <p
+          v-if="stockIssues.length"
+          class="mt-4 text-xs leading-relaxed text-red-400"
+        >
+          Не хватает в «{{ stockIssues[0]?.storeName }}»:
+          <template v-for="(issue, i) in stockIssues" :key="issue.name">
+            «{{ issue.name }}» (нужно {{ issue.need }}, есть {{ issue.available }}){{ i < stockIssues.length - 1 ? '; ' : '' }}
+          </template>
+          . Выберите другой магазин или уменьшите количество.
+        </p>
+
         <UButton
           class="mt-6 w-full"
           size="lg"
           :loading="submitting"
+          :disabled="!stockReady"
           :label="fulfillment === 'pickup' ? 'Зарезервировать' : 'Заказать доставку'"
           @click="submitOrder"
         />

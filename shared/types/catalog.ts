@@ -14,6 +14,7 @@ export interface CatalogProduct {
   currency: string
   imageUrl: string | null
   category: string | null
+  assortmentType: 'product' | 'variant'
   stocks: StoreStock[]
   totalStock: number
 }

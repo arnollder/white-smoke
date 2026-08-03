@@ -1,5 +1,6 @@
 import type { FulfillmentType } from '#shared/types/catalog'
 import {
+  fetchAllPages,
   msFetch,
   msMeta,
   type MsCollection,
@@ -8,6 +9,34 @@ import {
 } from './moysklad'
 import { findStoreBySlug, getDeliveryStore, type StoreConfig } from './stores'
 import { getCatalogProducts } from './catalog'
+
+/** Prefer env org UUID when valid; otherwise first non-archived organization. */
+async function resolveOrganizationId(): Promise<string> {
+  const config = useRuntimeConfig()
+  const fromEnv = String(config.moyskladOrganizationId || '').trim()
+
+  if (fromEnv) {
+    try {
+      await msFetch(`/entity/organization/${fromEnv}`)
+      return fromEnv
+    } catch {
+      // Stale UUID — fall through to live list
+    }
+  }
+
+  const orgs = (await fetchAllPages<{ id: string, archived?: boolean }>('/entity/organization', {
+    filter: 'archived=false'
+  })).filter(o => !o.archived)
+
+  const first = orgs[0]
+  if (!first?.id) {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'В МойСклад нет организации. Задайте MOYSKLAD_ORGANIZATION_ID'
+    })
+  }
+  return first.id
+}
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
@@ -90,12 +119,7 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
     }
   }
 
-  if (!config.moyskladOrganizationId) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'Задайте MOYSKLAD_ORGANIZATION_ID'
-    })
-  }
+  const organizationId = await resolveOrganizationId()
 
   let store: StoreConfig
   if (input.fulfillment === 'pickup') {
@@ -153,7 +177,7 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
       })
     }
 
-    const type = await resolveAssortmentType(product.id)
+    const type = product.assortmentType || 'product'
     positions.push({
       quantity: line.quantity,
       reserve: line.quantity,
@@ -177,34 +201,37 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{
     'Оплата при получении'
   ].filter(Boolean)
 
-  const order = await msFetch<MsCustomerOrder>('/entity/customerorder', {
-    method: 'POST',
-    body: {
-      organization: msMeta('organization', config.moyskladOrganizationId),
-      agent: msMeta('counterparty', agentId),
-      store: msMeta('store', store.msId),
-      description: descriptionParts.join('\n'),
-      shipmentAddress: deliveryAddress,
-      positions
-    }
-  })
-
-  return {
-    id: order.id,
-    name: order.name,
-    fulfillment: input.fulfillment,
-    storeSlug: store.slug,
-    message: input.fulfillment === 'pickup'
-      ? `Резерв ${order.name} оформлен. Заберите заказ в магазине «${store.name}».`
-      : `Заявка на доставку ${order.name} принята. Курьер свяжется с вами.`
-  }
-}
-
-async function resolveAssortmentType(id: string): Promise<'product' | 'variant'> {
   try {
-    await msFetch(`/entity/product/${id}`)
-    return 'product'
-  } catch {
-    return 'variant'
+    const order = await msFetch<MsCustomerOrder>('/entity/customerorder', {
+      method: 'POST',
+      body: {
+        organization: msMeta('organization', organizationId),
+        agent: msMeta('counterparty', agentId),
+        store: msMeta('store', store.msId),
+        description: descriptionParts.join('\n'),
+        shipmentAddress: deliveryAddress,
+        positions
+      }
+    })
+
+    return {
+      id: order.id,
+      name: order.name,
+      fulfillment: input.fulfillment,
+      storeSlug: store.slug,
+      message: input.fulfillment === 'pickup'
+        ? `Резерв ${order.name} оформлен. Заберите заказ в магазине «${store.name}».`
+        : `Заявка на доставку ${order.name} принята. Курьер свяжется с вами.`
+    }
+  } catch (err: unknown) {
+    const e = err as { status?: number, message?: string, body?: unknown }
+    if (e.status === 429) {
+      throw createError({
+        statusCode: 429,
+        statusMessage: 'МойСклад временно ограничивает запросы. Подождите несколько секунд и повторите.',
+        data: e.body
+      })
+    }
+    throw err
   }
 }

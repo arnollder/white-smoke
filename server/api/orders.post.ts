@@ -3,10 +3,18 @@ import { z } from 'zod'
 const bodySchema = z.object({
   items: z.array(z.object({
     id: z.string().min(1),
-    quantity: z.number().int().positive()
+    quantity: z.coerce.number().int().positive()
   })).min(1),
   fulfillment: z.enum(['pickup', 'delivery']),
-  storeSlug: z.string().optional(),
+  storeSlug: z.preprocess(
+    (value) => {
+      if (value && typeof value === 'object' && 'value' in (value as object)) {
+        return String((value as { value: unknown }).value || '')
+      }
+      return value
+    },
+    z.string().optional()
+  ),
   name: z.string().min(2, 'Укажите имя'),
   phone: z.string().min(10, 'Укажите телефон'),
   address: z.string().optional(),
@@ -20,7 +28,7 @@ export default defineEventHandler(async (event) => {
   if (!parsed.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: parsed.error.errors[0]?.message || 'Некорректные данные заказа'
+      statusMessage: parsed.error.issues[0]?.message || 'Некорректные данные заказа'
     })
   }
 
@@ -36,10 +44,11 @@ export default defineEventHandler(async (event) => {
     return await createCustomerOrder(data)
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err) throw err
-    const e = err as { message?: string, status?: number }
+    const e = err as { message?: string, status?: number, body?: unknown }
     throw createError({
       statusCode: e.status || 502,
-      statusMessage: e.message || 'Не удалось создать заказ в МойСклад'
+      statusMessage: e.message || 'Не удалось создать заказ в МойСклад',
+      data: e.body
     })
   }
 })

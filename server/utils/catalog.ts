@@ -11,6 +11,13 @@ import {
 } from './moysklad'
 import { resolveStoreConfigs, type StoreConfig } from './stores'
 
+const catalogCache = {
+  at: 0,
+  products: null as CatalogProduct[] | null
+}
+
+const CATALOG_CACHE_MS = 45_000
+
 function priceFromProduct(p: MsProduct | MsAssortmentRow): number {
   const value = p.salePrices?.[0]?.value
   if (value == null) return 0
@@ -51,6 +58,11 @@ function buildStocks(stockRow: MsStockByStoreRow | undefined, stores: StoreConfi
 }
 
 export async function getCatalogProducts(): Promise<CatalogProduct[]> {
+  const now = Date.now()
+  if (catalogCache.products && now - catalogCache.at < CATALOG_CACHE_MS) {
+    return catalogCache.products
+  }
+
   const token = useRuntimeConfig().moyskladToken?.trim()
   if (!token) {
     return getDemoCatalog(await resolveStoreConfigs())
@@ -100,18 +112,25 @@ export async function getCatalogProducts(): Promise<CatalogProduct[]> {
         currency: 'RUB',
         imageUrl: hasImage ? `/api/catalog/image/${id}` : null,
         category: categoryFromProduct(row),
+        assortmentType: type,
         stocks,
         totalStock
       })
     }
 
-    return products.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    const sorted = products.sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    catalogCache.products = sorted
+    catalogCache.at = Date.now()
+    return sorted
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'statusCode' in err) throw err
     const e = err as MoySkladError
+    const status = e.status || 502
     throw createError({
-      statusCode: e.status || 502,
-      statusMessage: e.message || 'Не удалось загрузить витрину из МойСклад',
+      statusCode: status,
+      statusMessage: status === 429
+        ? 'МойСклад временно ограничивает запросы. Подождите несколько секунд и повторите.'
+        : (e.message || 'Не удалось загрузить витрину из МойСклад'),
       data: e.body
     })
   }
@@ -188,6 +207,7 @@ function getDemoCatalog(stores: StoreConfig[]): CatalogProduct[] {
       currency: 'RUB',
       imageUrl: null,
       category: d.category,
+      assortmentType: 'product' as const,
       stocks,
       totalStock: stocks.reduce((a, b) => a + b.stock, 0)
     }
